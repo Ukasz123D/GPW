@@ -169,13 +169,14 @@ while restart == True:
             ttp = "odsetki od"
 
         if tpozycja in (0,1):
-            tcount = " w ilości " + tcount
+            tcountstr = " w ilości " + tcount
             tval = "po cenie jednostkowej "+tvalue+" PLN."
         else:
             tcount = "NULL"
+            tcountstr = ""
             tval = "o wartości "+tvalue+" PLN."
-
-        print("Dnia "+tdate+" "+tpoz+" "+ttp+" "+tname+tcount+" "+tval)
+        
+        print("Dnia "+tdate+" "+tpoz+" "+ttp+" "+tname+tcountstr+" "+tval)
 
         confirm = dict_prompt("Potwierdzasz?",yn_dict)
 

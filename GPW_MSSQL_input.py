@@ -30,7 +30,7 @@ print('Start: ' + tstart.strftime('%H:%M:%S'))
 conn_str = ('Driver={SQL Server};'
             'Server=3DOIT\MS3DOIT;'
             'Database=GPW;'
-            'Trysted_Connection=yes;')
+            'Trusted_Connection=yes;')
 cnxn = pyodbc.connect(conn_str)
 cursor = cnxn.cursor()
 
@@ -46,7 +46,7 @@ for row in cursor:
     nsdset.add(dt.date.fromisoformat(row.DATA))
 
 #ustalenie daty ostatniej aktalizacji (ostatniego notowania) z tabeli z notowaniami w bazie
-cursor.execute('SELECT MAX([DATA]) AS [DATA] FROM [GPW].[dbo].[NOTOWANIA]')
+cursor.execute('SELECT MAX([DATA]) AS [DATA] FROM [GPW].[dbo].[NOTOWANIA_GPW]')
 lastdate = dt.date.fromisoformat(cursor.fetchone()[0])
 currdate = dt.date.today()
 combfile = 'Combined_' + str(currdate)
@@ -55,7 +55,7 @@ combfile = 'Combined_' + str(currdate)
 download_data(lastdate, currdate)
 
 #ustalenie master listy ISIN + LP na podstawie danych w bazie
-mf = pd.read_sql('SELECT MAX([LP]) as [LP], [ISIN] FROM [NOTOWANIA] GROUP BY [ISIN]',cnxn)
+mf = pd.read_sql('SELECT MAX([LP]) as [LP], [ISIN] FROM [NOTOWANIA_GPW] GROUP BY [ISIN]',cnxn)
 
 #utworzenie nowej ramki dla komsolidacji ściągniętych plików
 newdf = pd.DataFrame()
@@ -80,8 +80,8 @@ for file in dwnfiles:
         try:
             df.iat[i,0] = mf.lookup([mf[mf['ISIN'] == df.at[i,'ISIN']].index.item()],['LP'])[0] + j
         except:
-            print('New entity: ' + df.at[i,'NAZWA'] + '. Added to list.')
-            newline = [-j+1,df.at[i,'NAZWA'],df.at[i,'ISIN'],'']
+            print('New entity: ' + df.at[i,'NAZWA'])
+            newline = [-j+1,df.at[i,'ISIN']]
             mf.loc[len(mf)] = newline
             df.iat[i,0] = mf.lookup([mf[mf['ISIN'] == df.at[i,'ISIN']].index.item()],['LP'])[0] + j
     #dopisanie aktualnego pliku do zestawienia
@@ -97,7 +97,7 @@ newdf.to_csv(combfile + '_MSSQL.csv', index = False)
 print('Importing to the database...')
 imp_df = pd.read_csv(combfile + '_MSSQL.csv')
 for index,row in imp_df.iterrows():
-    cursor.execute('INSERT INTO dbo.[NOTOWANIA]([LP],[DATA],[NAZWA],[ISIN],[OTWARCIE],[MAX],[MIN],[ZAMKNIECIE],[ZMIANA],[WOLUMEN]) values (?,?,?,?,?,?,?,?,?,?)', 
+    cursor.execute('INSERT INTO dbo.[NOTOWANIA_GPW]([LP],[DATA],[NAZWA],[ISIN],[OTWARCIE],[MAX],[MIN],[ZAMKNIECIE],[ZMIANA],[WOLUMEN]) values (?,?,?,?,?,?,?,?,?,?)', 
                     row['LP'], 
                     row['DATA'], 
                     row['NAZWA'],
@@ -117,13 +117,13 @@ os.remove(combfile + '_MSSQL.csv')
 qry = """WITH [TWRONG] AS (SELECT [ISIN], COUNT([NAZWA]) AS CNT
         FROM
         (SELECT DISTINCT [ISIN], [NAZWA]
-        FROM [NOTOWANIA]) AS TDST
+        FROM [NOTOWANIA_GPW]) AS TDST
         GROUP BY [ISIN]
         HAVING COUNT([NAZWA]) <> 1
         )
 
-        SELECT [ISIN], [NAZWA] FROM [NOTOWANIA]
-        WHERE [DATA] IN (SELECT MAX([DATA]) FROM [NOTOWANIA])
+        SELECT [ISIN], [NAZWA] FROM [NOTOWANIA_GPW]
+        WHERE [DATA] IN (SELECT MAX([DATA]) FROM [NOTOWANIA_GPW])
         AND [ISIN] IN (SELECT [ISIN] FROM [TWRONG])"""
 
 #zapis wyniku kwerendy to tymczasowej ramki
@@ -131,7 +131,7 @@ tempdf = pd.read_sql(qry,cnxn)
 tempdf['NAZWA'] = tempdf['NAZWA'].str.strip()
 #pętla przez wyniki i wykonanie aktualizacji
 for i in range (0, tempdf.shape[0]):
-    qry = "UPDATE [NOTOWANIA] SET [NAZWA]='"+tempdf.iat[i,1]+"' WHERE [ISIN]='"+tempdf.iat[i,0]+"'"
+    qry = "UPDATE [NOTOWANIA_GPW] SET [NAZWA]='"+tempdf.iat[i,1]+"' WHERE [ISIN]='"+tempdf.iat[i,0]+"'"
     print(tempdf.iat[i,0]+' changed name to '+tempdf.iat[i,1])
     cursor.execute(qry)
 
