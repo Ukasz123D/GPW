@@ -53,8 +53,6 @@ def get_info(obkod):
 
 #_____________________________________________________________________________________________________________
 #kod główny
-tstart = datetime.datetime.now()
-print('Start: ' + tstart.strftime('%H:%M:%S'))
 
 #połączenie z bazą
 print('Łączenie z bazą danych')
@@ -69,7 +67,7 @@ browser = webdriver.Chrome()
 browser.set_window_size(0, 0)
 
 #pobieranie danych
-print('Znajdowanie listy posiadanych obligacji...')
+print('/nZnajdowanie listy posiadanych obligacji...')
 df = pd.read_sql("""SELECT TRIM([NAZWA]) AS [NAZWA] FROM [CURR_PORTFEL_VW] WHERE [SEC_TYPE] = 1""",conn)
 print('Szukam informacji kolejnych wypłatach dla poszczególnych emisji - to trochę potrwa.')
 resdf = pd.DataFrame(columns=['NAZWA','DATA_WYP','VAL'])
@@ -117,9 +115,3 @@ browser.close()
 browser.quit()
 
 print('Koniec. Wynik załadowany do tabeli PREMIUM. Tymczasowy plik usunięty.')
-tstop = datetime.datetime.now()
-tdiff = tstop - tstart
-hours, reminder = divmod(tdiff.total_seconds(), 3600)
-minutes, seconds = divmod(reminder, 60)
-print('Stop: ' + tstop.strftime('%H:%M:%S'))
-print('Zadanie wykonane w czasie: %02i:%02i:%02i' % (hours, minutes, seconds))

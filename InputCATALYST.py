@@ -7,7 +7,7 @@ import pyodbc
 
 #procedura ściagania plików
 def download_data(lastdate, currdate):
-    print('Downloading CATALYST data...')
+    print('Ściąganie danych...')
     global dwnfiles
     dwnfiles = []
     #ustalenie listy dni od ostatniej aktualizacji do dziś
@@ -22,8 +22,7 @@ def download_data(lastdate, currdate):
 
 #____________________________________________________________________________________________________________________
 #kod główny
-tstart = dt.datetime.now()
-print('Start: ' + tstart.strftime('%H:%M:%S'))
+print('Aktualizacja danych o wynikach sesji CATALYST...')
 
 #połączenie z bazą
 conn_str = ('Driver={SQL Server};'
@@ -71,7 +70,7 @@ newdf = pd.DataFrame()
 j = 0
 
 #pętla przez ściągnięte pliki
-print('Updating and combining files...')
+print('Aktualizacja i łączenie plików...')
 for file in dwnfiles:
     print(file)
     j = j + 1
@@ -118,29 +117,33 @@ for file in dwnfiles:
     os.remove(file)
 
 #zapis tymczasowego pliku do uploadu
-print('Saving upload file...')
-newdf.to_csv(combfile + '_MSSQL.csv', index = False)
+print('Zapis pliku do uploadu...')
 
-#import do bazy
-print('Importing to the database...')
-imp_df = pd.read_csv(combfile + '_MSSQL.csv')
-for index,row in imp_df.iterrows():
-    cursor.execute('INSERT INTO dbo.[NOTOWANIA_CATALYST]([LP],[DATA],[NAZWA],[ISIN],[OTWARCIE],[MAX],[MIN],[ZAMKNIECIE],[ZMIANA],[WOLUMEN],[QUANT]) values (?,?,?,?,?,?,?,?,?,?,?)', 
-                    row['LP'], 
-                    row['DATA'], 
-                    row['NAZWA'],
-                    row['ISIN'],
-                    row['KURS OTWARCIA'],
-                    row['KURS MAX'],
-                    row['KURS MIN'],
-                    row['KURS ZAMKNIECIA'],
-                    row['ZMIANA'],
-                    row['WOLUMEN'],
-                    row['QUANT'])
+if not newdf.empty:
+    newdf.to_csv(combfile + '_MSSQL.csv', index = False)
 
-#usuwanie tymczasowego pliku
-os.remove(combfile + '_MSSQL.csv')
+    #import do bazy
+    print('Importowanie...')
+    imp_df = pd.read_csv(combfile + '_MSSQL.csv')
+    for index,row in imp_df.iterrows():
+        cursor.execute('INSERT INTO dbo.[NOTOWANIA_CATALYST]([LP],[DATA],[NAZWA],[ISIN],[OTWARCIE],[MAX],[MIN],[ZAMKNIECIE],[ZMIANA],[WOLUMEN],[QUANT]) values (?,?,?,?,?,?,?,?,?,?,?)', 
+                        row['LP'], 
+                        row['DATA'], 
+                        row['NAZWA'],
+                        row['ISIN'],
+                        row['KURS OTWARCIA'],
+                        row['KURS MAX'],
+                        row['KURS MIN'],
+                        row['KURS ZAMKNIECIA'],
+                        row['ZMIANA'],
+                        row['WOLUMEN'],
+                        row['QUANT'])
 
+    #usuwanie tymczasowego pliku
+    print('Usuwanie pliku tymczasowego...')
+    os.remove(combfile + '_MSSQL.csv')
+
+print('Finalizacja...')
 #aktualizacja tabeli notowania - aktualizacja nazw jezeli ulegly zmianie w czasie
 #kwerenda wyszykująca listę ISIN dla których istnieje w bazie wiecej niż jedna nazwa + najnowszą nazwę dla danego ISIN
 qry = """WITH [TWRONG] AS (SELECT [ISIN], COUNT([NAZWA]) AS CNT
@@ -161,18 +164,10 @@ tempdf['NAZWA'] = tempdf['NAZWA'].str.strip()
 #pętla przez wyniki i wykonanie aktualizacji
 for i in range (0, tempdf.shape[0]):
     qry = "UPDATE [NOTOWANIA_CATALYST] SET [NAZWA]='"+tempdf.iat[i,1]+"' WHERE [ISIN]='"+tempdf.iat[i,0]+"'"
-    print(tempdf.iat[i,0]+' changed name to '+tempdf.iat[i,1])
+    print(tempdf.iat[i,0]+' zmiana nazwy na '+tempdf.iat[i,1])
     cursor.execute(qry)
 
 #zamykanie połączenia
 cnxn.commit()
 cursor.close()
 cnxn.close()
-
-#podsumowanie
-tstop = dt.datetime.now()
-tdiff = tstop - tstart
-hours, reminder = divmod(tdiff.total_seconds(), 3600)
-minutes, seconds = divmod(reminder, 60)
-print('End: ' + tstop.strftime('%H:%M:%S'))
-print('Task completed in: %02i:%02i:%02i' % (hours, minutes, seconds))
